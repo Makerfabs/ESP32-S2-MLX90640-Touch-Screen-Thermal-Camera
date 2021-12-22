@@ -44,7 +44,7 @@ int pos[2] = {0, 0};
 
 #define MINTEMP 25
 #define MAXTEMP 37
-#define MLX_MIRROR 0 // Set 1 when the camera is facing the screen
+#define MLX_MIRROR 1 // Set 1 when the camera is facing the screen
 
 float frame[32 * 24]; // buffer for full frame of temperatures
 float *temp_frame = NULL;
