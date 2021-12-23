@@ -45,6 +45,8 @@ int pos[2] = {0, 0};
 #define MINTEMP 25
 #define MAXTEMP 37
 #define MLX_MIRROR 1 // Set 1 when the camera is facing the screen
+#define FILTER_ENABLE 1
+#define INTERPOLATION_ENABLE 0
 
 float frame[32 * 24]; // buffer for full frame of temperatures
 float *temp_frame = NULL;
@@ -174,6 +176,7 @@ int record_index = 0;
 void loop()
 {
     //获取一帧
+    //Get a frame
     if (mlx.getFrame(frame) != 0)
     {
         Serial.println("Get frame failed");
@@ -181,15 +184,32 @@ void loop()
     }
 
     //和上次结果平均，滤波
+    //Filter temperature data
     filter_frame(frame, temp_frame);
 
     //快排
     qusort(frame, 0, 32 * 24 - 1);
     max_temp += frame[767];
 
-    //温度矩阵转换图像矩阵，将32*24插值到320*240
-    interpolation(temp_frame, inter_p);
-    lcd.pushImage(0, 0, 320, 240, (lgfx::rgb565_t *)inter_p);
+    if (INTERPOLATION_ENABLE == 1)
+    {
+        //温度矩阵转换图像矩阵，将32*24插值到320*240
+        //Display with 320*240 pixel
+        interpolation(temp_frame, inter_p);
+        lcd.pushImage(0, 0, 320, 240, (lgfx::rgb565_t *)inter_p);
+    }
+    else
+    {
+        //Display with 32*24 pixel
+        for (uint8_t h = 0; h < 24; h++)
+        {
+            for (uint8_t w = 0; w < 32; w++)
+            {
+                uint8_t colorIndex = map_f(temp_frame[h * 32 + w], MINTEMP, MAXTEMP);
+                lcd.fillRect(10 * w, 10 * h, 10, 10, camColors[colorIndex]);
+            }
+        }
+    }
 
     fps++;
 
@@ -247,7 +267,10 @@ void filter_frame(float *in, float *out)
     {
         for (int i = 0; i < 32 * 24; i++)
         {
-            out[i] = (out[i] + in[i]) / 2;
+            if (FILTER_ENABLE == 1)
+                out[i] = (out[i] + in[i]) / 2;
+            else
+                out[i] = in[i];
         }
     }
     else
@@ -255,7 +278,10 @@ void filter_frame(float *in, float *out)
         for (int i = 0; i < 24; i++)
             for (int j = 0; j < 32; j++)
             {
-                out[32 * i + 31 - j] = (out[32 * i + 31 - j] + in[32 * i + j]) / 2;
+                if (FILTER_ENABLE == 1)
+                    out[32 * i + 31 - j] = (out[32 * i + 31 - j] + in[32 * i + j]) / 2;
+                else
+                    out[32 * i + 31 - j] = in[32 * i + j];
             }
     }
 }
