@@ -2,11 +2,11 @@
 
 ```c++
 /*
-Version:		V1.0
+Version:		V3.0
 Author:			Vincent
 Create Date:	2021/12/3
 Note:
-
+	2021/12/31	V3.0: Add Wifi mode,can display on a python program.
 	2021/12/22	V2.0: Added a modular kit and has an acrylic case.
 	
 */
@@ -65,6 +65,23 @@ Or just checking the temperature of your coffee.
 For detailed burning method, please refer to [Makerfabs ESP32-S2 Parallel TFT with Touch](https://github.com/Makerfabs/Makerfabs-ESP32-S2-Parallel-TFT-with-Touch)
 
 ## Firmware
+
+### Thermal_Camera V3
+
+Add a python display, without interporation.
+
+Run rec.py
+
+And need uncommitted WIFI_MODE.
+
+```c++
+//Choice local mode or wifi mode
+#define WIFI_MODE
+```
+
+![](md_pic/V3.jpg)
+
+
 
 ### Thermal_Camera V2
 
