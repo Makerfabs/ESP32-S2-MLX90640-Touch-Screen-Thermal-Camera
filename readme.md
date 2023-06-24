@@ -20,7 +20,7 @@ Note:
 
 [Makerfabs home page](https://www.makerfabs.com/)
 
-[Makerfabs Wiki](https://makerfabs.com/wiki/index.php?title=Main_Page)
+[Makerfabs Wiki](https://wiki.makerfabs.com/)
 
 # ESP32-S2 MLX90640 Touch Screen Thermal Camera
 ## Intruduce
