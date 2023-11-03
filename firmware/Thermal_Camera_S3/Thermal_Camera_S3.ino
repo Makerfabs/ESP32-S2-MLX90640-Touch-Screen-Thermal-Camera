@@ -1,9 +1,21 @@
 /*
 Makerfabs MLX90640 Camera demo
 Author  : Vincent
-Version : 3.0
+Version : 3.1
 
-Att
+        V3.1: Added camera spot repair function.
+
+
+
+使用 1.1.9  版本的库 LovyanGFX 在文件夹： C:\Users\maker\Documents\Arduino\libraries\LovyanGFX 
+使用 2.0.0  版本的库 Wire 在文件夹： C:\Users\maker\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\Wire 
+使用 1.0.4  版本的库 Adafruit_MLX90640 在文件夹： C:\Users\maker\Documents\Arduino\libraries\Adafruit_MLX90640 
+使用 1.14.4  版本的库 Adafruit_BusIO 在文件夹： C:\Users\maker\Documents\Arduino\libraries\Adafruit_BusIO 
+使用 2.0.0  版本的库 FS 在文件夹： C:\Users\maker\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\FS 
+使用 2.0.0  版本的库 SD 在文件夹： C:\Users\maker\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\SD 
+使用 2.0.0  版本的库 SPI 在文件夹： C:\Users\maker\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.11\libraries\SPI 
+
+
 
 */
 
@@ -50,7 +62,7 @@ const int i2c_touch_addr = TOUCH_I2C_ADD;
 int touch_flag = 0;
 int pos[2] = {0, 0};
 
-#define MINTEMP 25
+#define MINTEMP 28
 #define MAXTEMP 37
 #define MLX_MIRROR 0 // Set 1 when the camera is facing the screen
 #define FILTER_ENABLE 1
@@ -74,29 +86,29 @@ void setup(void)
     digitalWrite(LCD_CS, LOW);
     digitalWrite(LCD_BLK, HIGH);
 
-    Serial.begin(115200);
+    USBSerial.begin(115200);
 
 #ifdef WIFI_MODE
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
-    Serial.println(F(""));
+    USBSerial.println(F(""));
 
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(500);
-        Serial.print(F("."));
+        USBSerial.print(F("."));
     }
-    Serial.println(F(""));
-    Serial.print(F("Connected to "));
-    Serial.println(ssid);
-    Serial.print(F("IP address: "));
-    Serial.println(WiFi.localIP());
+    USBSerial.println(F(""));
+    USBSerial.print(F("Connected to "));
+    USBSerial.println(ssid);
+    USBSerial.print(F("IP address: "));
+    USBSerial.println(WiFi.localIP());
 
     if (client.connect(host, 80))
     {
-        Serial.println(F("Success"));
+        USBSerial.println(F("Success"));
         client.print(String("GET /") + " HTTP/1.1\r\n" +
                      "Host: " + host + "\r\n" +
                      "Connection: close\r\n" +
@@ -104,7 +116,7 @@ void setup(void)
     }
 #endif
 
-    Serial.println(ESP.getFreeHeap());
+    USBSerial.println(ESP.getFreeHeap());
 
     lcd.init();
     lcd.setRotation(0);
@@ -113,7 +125,7 @@ void setup(void)
     SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
     if (SD_init())
     {
-        Serial.println(F("SD init error"));
+        USBSerial.println(F("SD init error"));
     }
     appendFile(SD, "/temper.txt", "New Begin\n");
 
@@ -126,25 +138,25 @@ void setup(void)
 
     if (error == 0)
     {
-        Serial.print(F("I2C device found at address 0x"));
-        Serial.print(MLX_I2C_ADDR, HEX);
-        Serial.println(F("  !"));
+        USBSerial.print(F("I2C device found at address 0x"));
+        USBSerial.print(MLX_I2C_ADDR, HEX);
+        USBSerial.println(F("  !"));
     }
     else if (error == 4)
     {
-        Serial.print(F("Unknown error at address 0x"));
-        Serial.println(MLX_I2C_ADDR, HEX);
+        USBSerial.print(F("Unknown error at address 0x"));
+        USBSerial.println(MLX_I2C_ADDR, HEX);
     }
 
-    Serial.println(F("Adafruit MLX90640 Simple Test"));
+    USBSerial.println(F("Adafruit MLX90640 Simple Test"));
     if (!mlx.begin(MLX90640_I2CADDR_DEFAULT, &Wire))
     {
-        Serial.println(F("MLX90640 not found!"));
+        USBSerial.println(F("MLX90640 not found!"));
         while (1)
             delay(10);
     }
 
-    //mlx.setMode(MLX90640_INTERLEAVED);
+    // mlx.setMode(MLX90640_INTERLEAVED);
     mlx.setMode(MLX90640_CHESS);
     mlx.setResolution(MLX90640_ADC_18BIT);
     mlx90640_resolution_t res = mlx.getResolution();
@@ -152,7 +164,7 @@ void setup(void)
     mlx90640_refreshrate_t rate = mlx.getRefreshRate();
     Wire.setClock(1000000); // max 1 MHz
 
-    Serial.println(ESP.getFreeHeap());
+    USBSerial.println(ESP.getFreeHeap());
 
     //image init
     if (INTERPOLATION_ENABLE == 1)
@@ -160,7 +172,7 @@ void setup(void)
         inter_p = (uint16_t *)malloc(320 * 240 * sizeof(uint16_t));
         if (inter_p == NULL)
         {
-            Serial.println(F("inter_p Malloc error"));
+            USBSerial.println(F("inter_p Malloc error"));
         }
 
         for (int i = 0; i < 320 * 240; i++)
@@ -168,23 +180,23 @@ void setup(void)
             *(inter_p + i) = 0x480F;
         }
 
-        Serial.println(ESP.getFreeHeap());
+        USBSerial.println(ESP.getFreeHeap());
     }
 
     //frame init
     temp_frame = (float *)malloc(32 * 24 * sizeof(float));
     if (temp_frame == NULL)
     {
-        Serial.println(F("temp_frame Malloc error"));
+        USBSerial.println(F("temp_frame Malloc error"));
     }
 
     for (int i = 0; i < 32 * 24; i++)
     {
         temp_frame[i] = MINTEMP;
     }
-    Serial.println(ESP.getFreeHeap());
+    USBSerial.println(ESP.getFreeHeap());
 
-    Serial.println(F("All init over."));
+    USBSerial.println(F("All init over."));
 }
 
 uint32_t runtime = 0;
@@ -198,9 +210,11 @@ void loop()
     //Get a frame
     if (mlx.getFrame(frame) != 0)
     {
-        Serial.println(F("Get frame failed"));
+        USBSerial.println(F("Get frame failed"));
         return;
     }
+
+    bug_fix(frame);
 
     //和上次结果平均，滤波
     //Filter temperature data
@@ -234,7 +248,7 @@ void loop()
 
     if (get_pos(pos))
     {
-        Serial.println((String) "x=" + pos[0] + ",y=" + pos[1]);
+        // USBSerial.println((String) "x=" + pos[0] + ",y=" + pos[1]);
         if (pos[0] > 210 && pos[1] > 400 && pos[0] < 320 && pos[1] < 480)
         {
             touch_flag = 1;
@@ -433,56 +447,56 @@ int SD_init()
 
     if (!SD.begin(SD_CS))
     {
-        Serial.println(F("Card Mount Failed"));
+        USBSerial.println(F("Card Mount Failed"));
         return 1;
     }
     uint8_t cardType = SD.cardType();
 
     if (cardType == CARD_NONE)
     {
-        Serial.println(F("No SD card attached"));
+        USBSerial.println(F("No SD card attached"));
         return 1;
     }
 
-    Serial.print(F("SD Card Type: "));
+    USBSerial.print(F("SD Card Type: "));
     if (cardType == CARD_MMC)
     {
-        Serial.println(F("MMC"));
+        USBSerial.println(F("MMC"));
     }
     else if (cardType == CARD_SD)
     {
-        Serial.println(F("SDSC"));
+        USBSerial.println(F("SDSC"));
     }
     else if (cardType == CARD_SDHC)
     {
-        Serial.println(F("SDHC"));
+        USBSerial.println(F("SDHC"));
     }
     else
     {
-        Serial.println(F("UNKNOWN"));
+        USBSerial.println(F("UNKNOWN"));
     }
 
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB\n", cardSize);
+    USBSerial.printf("SD Card Size: %lluMB\n", cardSize);
     listDir(SD, "/", 2);
 
-    Serial.println(F("SD init over."));
+    USBSerial.println(F("SD init over."));
     return 0;
 }
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 {
-    Serial.printf("Listing directory: %s\n", dirname);
+    USBSerial.printf("Listing directory: %s\n", dirname);
 
     File root = fs.open(dirname);
     if (!root)
     {
-        Serial.println(F("Failed to open directory"));
+        USBSerial.println(F("Failed to open directory"));
         return;
     }
     if (!root.isDirectory())
     {
-        Serial.println(F("Not a directory"));
+        USBSerial.println(F("Not a directory"));
         return;
     }
 
@@ -491,8 +505,8 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
     {
         if (file.isDirectory())
         {
-            Serial.print(F("  DIR : "));
-            Serial.println(file.name());
+            USBSerial.print(F("  DIR : "));
+            USBSerial.println(file.name());
             if (levels)
             {
                 listDir(fs, file.name(), levels - 1);
@@ -500,10 +514,10 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
         }
         else
         {
-            Serial.print(F("  FILE: "));
-            Serial.print(file.name());
-            Serial.print(F("  SIZE: "));
-            Serial.println(file.size());
+            USBSerial.print(F("  FILE: "));
+            USBSerial.print(file.name());
+            USBSerial.print(F("  SIZE: "));
+            USBSerial.println(file.size());
         }
         file = root.openNextFile();
     }
@@ -511,61 +525,61 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 
 void readFile(fs::FS &fs, const char *path)
 {
-    Serial.printf("Reading file: %s\n", path);
+    USBSerial.printf("Reading file: %s\n", path);
 
     File file = fs.open(path);
     if (!file)
     {
-        Serial.println(F("Failed to open file for reading"));
+        USBSerial.println(F("Failed to open file for reading"));
         return;
     }
 
-    Serial.print(F("Read from file: "));
+    USBSerial.print(F("Read from file: "));
     while (file.available())
     {
-        Serial.write(file.read());
+        USBSerial.write(file.read());
     }
     file.close();
 }
 
 void writeFile(fs::FS &fs, const char *path, const char *message)
 {
-    Serial.printf("Writing file: %s\n", path);
+    USBSerial.printf("Writing file: %s\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if (!file)
     {
-        Serial.println(F("Failed to open file for writing"));
+        USBSerial.println(F("Failed to open file for writing"));
         return;
     }
     if (file.print(message))
     {
-        Serial.println(F("File written"));
+        USBSerial.println(F("File written"));
     }
     else
     {
-        Serial.println(F("Write failed"));
+        USBSerial.println(F("Write failed"));
     }
     file.close();
 }
 
 void appendFile(fs::FS &fs, const char *path, const char *message)
 {
-    Serial.printf("Appending to file: %s\n", path);
+    USBSerial.printf("Appending to file: %s\n", path);
 
     File file = fs.open(path, FILE_APPEND);
     if (!file)
     {
-        Serial.println(F("Failed to open file for appending"));
+        USBSerial.println(F("Failed to open file for appending"));
         return;
     }
     if (file.print(message))
     {
-        Serial.println(F("Message appended"));
+        USBSerial.println(F("Message appended"));
     }
     else
     {
-        Serial.println(F("Append failed"));
+        USBSerial.println(F("Append failed"));
     }
     file.close();
 }
@@ -574,11 +588,22 @@ void appendFile(fs::FS &fs, const char *path, const char *message)
 
 void send_udp(String msg_json)
 {
-    Serial.println(F("Prepare send UDP"));
+    USBSerial.println(F("Prepare send UDP"));
     if (client.connected())
     {
         client.print(msg_json);
-        Serial.println(F("UDP send"));
+        USBSerial.println(F("UDP send"));
     }
 }
 #endif
+
+
+// The camera allows up to four non-consecutive bad points with a value of nan.
+void bug_fix(float *frame)
+{
+    for (int i = 0; i < 768 - 1; i++)
+    {
+        if (isnan(frame[i]))
+            frame[i] = frame[i + 1];
+    }
+}
