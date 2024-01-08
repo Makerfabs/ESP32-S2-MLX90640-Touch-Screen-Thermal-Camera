@@ -1,11 +1,13 @@
-# ESP32-S2 MLX90640 Touch Screen Thermal Camera 
+# ESP32-S3 MLX90640 Touch Screen Thermal Camera 
 
 ```c++
 /*
-Version:		V3.0
+Version:		V3.2
 Author:			Vincent
 Create Date:	2021/12/3
 Note:
+	2024/1/8	V3.2: The S2 has been discontinued, and all tests under the S3 have passed.
+				V3.1: Added the function of shielding bad spots
 	2021/12/31	V3.0: Add Wifi mode,can display on a python program.
 	2021/12/22	V2.0: Added a modular kit and has an acrylic case.
 	
@@ -29,7 +31,7 @@ Product Link ：[]()
 
 Wiki Link : []() 
 
-Based on Makefabs ESP32-S2 Parallel TFT, Mabee MLX90640(Thermal imaging camera). This is a thermal imaging camera kit, contains a laser-cut acrylic case. 
+Based on Makefabs ESP32-S3 Parallel TFT, Mabee MLX90640(Thermal imaging camera). This is a thermal imaging camera kit, contains a laser-cut acrylic case. 
 
 It can realize non-contact remote temperature measurement and fault detection. The advantage is that it is simple and intuitive, showing temperature differences across the entire region. It can also detect the movement of living things with no light at all.
 
@@ -39,8 +41,8 @@ Or just checking the temperature of your coffee.
 
 # Item List
 
-- [Makerfabs ESP32-S2 Parallel TFT with Touch](https://github.com/Makerfabs/Makerfabs-ESP32-S2-Parallel-TFT-with-Touch)
-- Mabee MLX90640 
+- [Makerfabs ESP32-S2 Parallel TFT with Touch](https://www.makerfabs.com/esp32-s3-parallel-tft-with-touch-ili9488.html)
+- [Mabee MLX90640](https://www.makerfabs.com/mabee-mlx90640.html)
 
 
 ### Front:
@@ -58,13 +60,28 @@ Or just checking the temperature of your coffee.
 
 **If you have any questions，such as how to install the development board, how to download the code, how to install the library. Please refer to :[Makerfabs_FAQ](https://github.com/Makerfabs/Makerfabs_FAQ)**
 
-- Install board : ESP32 .
-- Install library : LovyanGFX
-- Install library : Adafruit_MLX90640
+- Install board : ESP32
 
-For detailed burning method, please refer to [Makerfabs ESP32-S2 Parallel TFT with Touch](https://github.com/Makerfabs/Makerfabs-ESP32-S2-Parallel-TFT-with-Touch)
+```
+
+Using 1.1.9  Version LovyanGFX    LovyanGFX 
+Using 2.0.0  Version Wire    esp32\2.0.11\libraries\Wire 
+Using 1.0.4  Version Adafruit_MLX90640    Adafruit_MLX90640 
+Using 1.14.4  Version Adafruit_BusIO    Adafruit_BusIO 
+Using 2.0.0  Version FS    esp32\2.0.11\libraries\FS 
+Using 2.0.0  Version SD    esp32\2.0.11\libraries\SD 
+Using 2.0.0  Version SPI    esp32\2.0.11\libraries\SPI 
+
+
+```
+
+For detailed burning method, please refer to [Makerfabs-ESP32-S3-Parallel-TFT-with-Touch](https://github.com/Makerfabs/Makerfabs-ESP32-S3-Parallel-TFT-with-Touch)
 
 ## Firmware
+
+### Thermal_Camera S3
+
+The S2 has been discontinued, and all tests under the S3 have passed.
 
 ### Thermal_Camera V3
 
