@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .flipButton {
+            width: 470px;
+            height: 50px;
+        }
+
+        #temperature {
+            padding: 5px;
+            width: 470px;
+            font-size: 1.8em;
+            text-align: center;
+        }
+    </style>
+    <script>
+        let startX = 0;
+        let moveX = 10;
+        const positive = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        const negative = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
+        const color_list =
+            [
+                [9, 73, 247],
+                [80, 128, 255],
+                [70, 128, 255],
+                [60, 135, 255],
+                [50, 135, 255],
+                [45, 155, 255],
+                [45, 170, 255],
+                [40, 180, 255],
+
+                [40, 190, 244],
+                [40, 200, 239],
+                [40, 210, 243],
+                [40, 215, 235],
+                [40, 220, 243],
+                [40, 220, 244],
+                [40, 220, 232],
+                [40, 220, 216],
+
+                [45, 220, 176],
+                [45, 220, 111],
+                [45, 220, 102],
+                [50, 220, 90],
+                [70, 220, 100],
+                [100, 225, 110],
+                [120, 230, 113],
+                [140, 235, 114],
+
+                [180, 240, 128],
+                [190, 240, 128],
+                [195, 230, 128],
+                [200, 215, 128],
+                [210, 200, 128],
+                [220, 185, 128],
+                [230, 160, 128],
+                [255, 128, 128]
+            ];
+
+        function decompress(compressed, rowLength) {
+            const parts = compressed.split('.');
+            let output = [];
+            let result = parts[1];
+            // First character is the decimal precision
+            let decimals = parseInt(parts[0].substring(0, 1));
+            // Second character is the accuracy, e.g. 5 would round to nearest 5
+            let accuracy = parseInt(parts[0].substring(1, 2));
+            // Value of the first reading
+            let start = parseInt(parts[0].substring(2, parts[0].length));
+            start = start / Math.pow(10.0, decimals);
+            // Push the first reading into the result array
+            output.push(start);
+
+            // bbbb is compressed to 4b, the numeric value 4 is stored in the multiplier variable
+            let multiplier = '';
+            let counter = 1;
+
+            // Use Aa-Zz values to calculate the diff from the previous value
+            for (let n = 0; n < result.length; n += 1) {
+                let found = false;
+                let indexOfItem = positive.indexOf(result[n]);
+
+                if (indexOfItem === -1) {
+                    indexOfItem = negative.indexOf(result[n]);
+                    if (indexOfItem >= 0) {
+                        found = true;
+                        indexOfItem = -indexOfItem;
+                    }
+                } else {
+                    found = true;
+                }
+                // If not Aa-Zz it will be a numeric multiplier
+                if (!found) {
+                    multiplier += result[n];
+                } else {
+                    // Found a Aa-Zz match! Calculate the numeric value.
+                    if (Math.abs(indexOfItem) > 0) {
+                        indexOfItem = indexOfItem * accuracy;
+                    }
+                    indexOfItem = indexOfItem / Math.pow(10, decimals);
+
+                    multiplier = parseInt(multiplier);
+
+                    if (counter > 1 && counter % rowLength === 0) {
+                        start = output[counter - rowLength];
+                    }
+                    counter += 1;
+                    // console.log(result[n], indexOfItem);
+                    start += indexOfItem;
+                    output.push(parseFloat(parseFloat(start).toFixed(decimals)));
+
+                    // Turn 4b into bbbb
+                    while (multiplier > 1) {
+
+                        if (counter > 1 && counter % rowLength === 0) {
+                            start = output[counter - rowLength];
+                        }
+                        counter += 1;
+                        start += indexOfItem;
+                        output.push(parseFloat(parseFloat(start).toFixed(decimals)));
+                        multiplier -= 1;
+                    }
+                    multiplier = '';
+
+                }
+
+            }
+            return output;
+        }
+
+        function interpolateData(input, rowLength) {
+            const output = [];
+            let rowNum = 1;
+            for (let n = 0; n < input.length; n += 1) {
+                //output.push(n % rowLength);
+                if (n % rowLength === 0) {
+                    output.push((input[n] + input[n + 1]) / 2)
+                } else if (n > 0) {
+                    output.push((input[n] + input[n - 1]) / 2)
+                } else {
+                    output.push(input[n]);
+                }
+
+                if ((n + 1) % rowLength === 0) {
+                    if (input.length - n > rowLength) {
+                        for (let r = 1; r <= rowLength * 2 - 1; r++) {
+                            const roundedA = ((rowNum - 1) * rowLength) + Math.floor((r - 1) / 2);
+                            const roundedB = ((rowNum - 1) * rowLength) + Math.floor((r - 1) / 2);
+                            const topA = input[roundedA];
+                            const topB = input[roundedB];
+                            const roundedC = (rowNum * rowLength) + Math.floor((r - 1) / 2);
+                            const roundedD = (rowNum * rowLength) + Math.floor((r - 1) / 2);
+                            const bottomA = input[roundedC];
+                            const bottomB = input[roundedD];
+                            //output.push(0);
+                            output.push((topA + topB + bottomA + bottomB) / 4);
+                        }
+                        rowNum += 1;
+                    }
+                    // Do nothing
+                } else {
+                    //output.push(0);
+                    output.push((input[n] + input[n + 1]) / 2)
+                }
+            }
+            return output;
+        }
+
+        function flip() {
+            if (startX === 0) {
+                startX = 460;
+                moveX = -10;
+            } else {
+                startX = 0;
+                moveX = 10;
+            }
+        }
+
+        function temp2color(temp) {
+
+            let max_temp = 40;
+            let min_temp = 5;
+
+
+            let i = parseInt((temp - min_temp) / (max_temp - min_temp) * 32);
+            if (i < 0)
+                i = 0;
+            if (i > 31)
+                i = 31;
+
+            let r = color_list[i][0];
+            let g = color_list[i][1];
+            let b = color_list[i][2];
+
+            return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+        }
+
+        function drawRainBow() {
+            let c1 = document.getElementById('rainbow');
+            let c1_context = c1.getContext('2d');
+            let xPos = 0;
+            let yPos = 0;
+            for (let i = 0; i < 32; i += 1) {
+
+                let r = color_list[i][0];
+                let g = color_list[i][1];
+                let b = color_list[i][2];
+                let color = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+
+                c1_context.fillStyle = color;
+                c1_context.fillRect(xPos, yPos, 15, 20);
+                xPos += 15;
+            }
+        }
+
+        // main ````````````````````````````````````````````````````````````````````````````````````````
+
+        // web
+        let url = 'ws://thermal.local:81';
+        if (typeof ipAddress !== 'undefined') {
+            // Android doesn't support mDNS, use ipAddress if provided
+            url = 'ws://' + ipAddress + ':81';
+        }
+        let connection = new WebSocket(url);
+        connection.onopen = function () {
+            connection.send('Ping'); // Send the message 'Ping' to the server
+        };
+        // Log errors
+        connection.onerror = function (error) {
+            console.log('WebSocket Error ' + error);
+        };
+
+        // temperature
+        let avgHighTemp = 0;
+        let avgLowTemp = 0;
+
+        let counter = 30;
+
+       
+
+        // Log messages from the server
+        connection.onmessage = function (e) {
+            if (e.data.length < 100) {
+                return;
+            }
+            // console.log(e.data);
+
+            // unpress
+            const values = decompress(e.data, 32);
+            const tempValues = interpolateData(values, 32);
+
+            // avgHighTemp
+            const sortedValues = values.slice().sort();
+            avgHighTemp = 0;
+            for (let w = sortedValues.length - 3; w > sortedValues.length - 10; w -= 1) {
+                avgHighTemp += sortedValues[w];
+            }
+            avgHighTemp = avgHighTemp / 7;
+
+            // avgLowTemp
+            avgLowTemp = 0;
+            for (let w = 4; w < 24; w += 1) {
+                avgLowTemp += sortedValues[w];
+            }
+            avgLowTemp = avgLowTemp / 20;
+
+            if (counter >= 20) {
+                document.getElementById('temperature').innerText = 'High: ' + parseInt(avgHighTemp) + ' C | Low: ' + parseInt(avgLowTemp) + ' C';
+                counter = 0;
+            }
+            counter += 1;
+
+            var c2 = document.getElementById('myCanvas');
+            var c2_context = c2.getContext('2d');
+            let xPos = startX;
+            let yPos = 0;
+            for (let i = 0; i < tempValues.length; i += 1) {
+                c2_context.fillStyle = temp2color(tempValues[i]);
+                c2_context.fillRect(xPos, yPos, 10, 20);
+                yPos += 10;
+                if (i > 0 && (i + 1) % 63 === 0) {
+                    xPos += moveX;
+                    yPos = 0;
+                }
+            }
+
+            drawRainBow();
+        };
+
+        // main over ````````````````````````````````````````````````````````````````````````````````````````
+
+    </script>
+</head>
+
+<body>
+    <canvas id='myCanvas' width='470' height='630' style='border:1px solid #d3d3d3;'></canvas>
+    <p></p>
+    <canvas id='rainbow' width='480' height='20' style='border:1px solid #d3d3d3;'></canvas>
+    <p id='temperature'></p>
+    <button class='flipButton' onclick='flip()'>Flip Camera</button>
+    <p id='ip'></p>
+</body>
+<script>
+    if (typeof ipAddress !== 'undefined') {
+        document.getElementById('ip').innerText = 'IP: ' + ipAddress;
+    }
+</script>
+
+</html>
