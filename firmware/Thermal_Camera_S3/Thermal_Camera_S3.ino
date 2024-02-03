@@ -65,6 +65,8 @@ int pos[2] = {0, 0};
 #define UI_REFRESH_SECONDS 1
 
 #define FAHRENHEIT 1
+#define SAVE_SCREENSHOTS 1
+String screenshotsDir = "screenshots1";
 
 //#define MINTEMP 28
 //#define MAXTEMP 37
@@ -143,6 +145,10 @@ void setup(void)
         USBSerial.println(F("SD init error"));
     }
     appendFile(SD, "/temper.txt", "New Begin\n");
+
+    if(SAVE_SCREENSHOTS == 1) {
+      screenshotsDir = getNextScreenshotDirectory(SD);
+    }
 
     //I2C init
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -341,6 +347,10 @@ void loop()
             char c[20];
             sprintf(c, "[%d]\tT:%lf C\n", record_index++, avg_max_temp / fps);
             appendFile(SD, "/temper.txt", c);
+
+            if(SAVE_SCREENSHOTS == 1) {
+              screenshot(&lcd, SD, String("screenshot-") + record_index + ".bmp");
+            }
         }
 
         runtime = millis();
@@ -537,6 +547,26 @@ int SD_init()
     return 0;
 }
 
+String getNextScreenshotDirectory(fs::FS &fs) {
+  File root = fs.open("/");
+
+  if (!root)
+  {
+      USBSerial.println(F("Failed to open directory"));
+      return "screenshots1";
+  }
+
+  uint8_t screenshotDirectories = 1;
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory() && ((String) file.name()).startsWith("screenshots")) {
+        screenshotDirectories++;
+    }
+  }
+
+  return "screenshots" + screenshotDirectories;
+}
+
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 {
     USBSerial.printf("Listing directory: %s\n", dirname);
@@ -659,4 +689,134 @@ void bug_fix(float *frame)
         if (isnan(frame[i]))
             frame[i] = frame[i + 1];
     }
+}
+
+void screenshot(LGFX* _lcd, fs::FS &fs, String filename) {
+  File file = fs.open(screenshotsDir + "/" + filename, FILE_WRITE);
+  if (!file) {
+    ESP_LOGW("file not open(%s)\n", filename);
+  }
+
+  uint8_t headSize = 66;
+  uint16_t width = _lcd->width();
+  uint16_t height = _lcd->height();
+  uint16_t dataSize = width * height * 2;
+  uint16_t fileSize = headSize + dataSize;
+  uint16_t rMask = 0b1111100000000000;
+  uint16_t gMask = 0b0000011111100000;
+  uint16_t bMask = 0b0000000000011111;
+
+  // BMP Header
+  file.write('B');
+  file.write('M');
+
+  // fileSize
+  file.write((uint8_t)(fileSize & 0xff));
+  file.write((uint8_t)(fileSize >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // Reserve
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // headSize
+  file.write(headSize);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // infoSize
+  file.write(0x28);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // width
+  file.write((uint8_t)(width & 0xff));
+  file.write((uint8_t)(width >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // height
+  file.write((uint8_t)(height & 0xff));
+  file.write((uint8_t)(height >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // plane
+  file.write(0x01);
+  file.write(0x00);
+
+  // bit/pixel
+  file.write(16);
+  file.write(0x00);
+
+  // compression
+  file.write(0x03);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // dataSize
+  file.write((uint8_t)(dataSize & 0xff));
+  file.write((uint8_t)(dataSize >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // Horizontal resolution
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // Vertical resolution
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // Color Size
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // Number of important colors
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+  file.write(0x00);
+
+  // R MASK
+  file.write((uint8_t)(rMask & 0xff));
+  file.write((uint8_t)(rMask >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // G MASK
+  file.write((uint8_t)(gMask & 0xff));
+  file.write((uint8_t)(gMask >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // B MASK
+  file.write((uint8_t)(bMask & 0xff));
+  file.write((uint8_t)(bMask >> 8));
+  file.write(0x00);
+  file.write(0x00);
+
+  // DATA
+  bool swap = _lcd->getSwapBytes();
+  _lcd->setSwapBytes(true);
+  for (int y = 0; y < height; y++) {
+    uint16_t pl[width];
+    _lcd->readRect(0, height - y - 1, width, 1, pl);
+    file.write((uint8_t *)pl, width * 2);
+  }
+  _lcd->setSwapBytes(swap);
+
+  file.close();
 }
