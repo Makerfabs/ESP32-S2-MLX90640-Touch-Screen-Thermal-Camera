@@ -562,6 +562,7 @@ String getNextScreenshotDirectory(fs::FS &fs) {
     if (file.isDirectory() && ((String) file.name()).startsWith("screenshots")) {
         screenshotDirectories++;
     }
+    file = root.openNextFile();
   }
 
   return "screenshots" + screenshotDirectories;
@@ -692,10 +693,11 @@ void bug_fix(float *frame)
 }
 
 void screenshot(LGFX* _lcd, fs::FS &fs, String filename) {
-  File file = fs.open(screenshotsDir + "/" + filename, FILE_WRITE);
+  File file = fs.open("/" + screenshotsDir + "/" + filename, FILE_WRITE);
   if (!file) {
     ESP_LOGW("file not open(%s)\n", filename);
   }
+  fs.mkdir("/" + screenshotsDir);
 
   uint8_t headSize = 66;
   uint16_t width = _lcd->width();
