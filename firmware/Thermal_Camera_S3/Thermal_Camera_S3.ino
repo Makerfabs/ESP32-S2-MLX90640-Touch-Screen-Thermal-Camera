@@ -62,8 +62,16 @@ const int i2c_touch_addr = TOUCH_I2C_ADD;
 int touch_flag = 0;
 int pos[2] = {0, 0};
 
-#define MINTEMP 28
-#define MAXTEMP 37
+#define UI_REFRESH_SECONDS 1
+
+#define FAHRENHEIT 1
+
+//#define MINTEMP 28
+//#define MAXTEMP 37
+float MINTEMP = 10;
+float MAXTEMP = 49;
+#define DYNAMIC_RANGE 1
+#define DYNAMIC_RANGE_PADDING 0
 #define MLX_MIRROR 0 // Set 1 when the camera is facing the screen
 #define FILTER_ENABLE 1
 
@@ -77,6 +85,13 @@ int pos[2] = {0, 0};
 float frame[32 * 24]; // buffer for full frame of temperatures
 float *temp_frame = NULL;
 uint16_t *inter_p = NULL;
+
+float convertTemp(float c) {
+  #ifdef FAHRENHEIT
+    c = (c * 9/5) + 32;
+  #endif
+  return c;
+}
 
 void setup(void)
 {
@@ -201,7 +216,8 @@ void setup(void)
 
 uint32_t runtime = 0;
 int fps = 0;
-float max_temp = 0.0;
+float avg_max_temp = 0.0;
+float avg_min_temp = 0.0;
 int record_index = 0;
 
 void loop()
@@ -222,7 +238,18 @@ void loop()
 
     //快排
     qusort(frame, 0, 32 * 24 - 1);
-    max_temp += frame[767];
+    avg_max_temp += frame[767];
+    avg_min_temp += frame[1];
+
+    if(DYNAMIC_RANGE == 1) {
+      //if ((millis() - runtime) > UI_REFRESH_SECONDS * 1000) {
+        MINTEMP = frame[1];
+        MAXTEMP = frame[767];
+
+        MINTEMP -= DYNAMIC_RANGE_PADDING;
+        MAXTEMP += DYNAMIC_RANGE_PADDING;
+      //}
+    }
 
     if (INTERPOLATION_ENABLE == 1)
     {
@@ -255,25 +282,47 @@ void loop()
         }
     }
 
-    if ((millis() - runtime) > 2000)
+    if ((millis() - runtime) > UI_REFRESH_SECONDS * 1000)
     {
+    	  display_ui();
         lcd.fillRect(0, 280, 319, 79, TFT_BLACK);
+        lcd.fillRect(0, 360, 150, 150, TFT_BLACK);
 
-        lcd.setTextSize(4);
+        lcd.setCursor(0, 300);
+        
+        if(DYNAMIC_RANGE != 1) {
+          lcd.setTextColor(camColors[map_f(avg_min_temp / fps, MINTEMP, MAXTEMP)]);
+        }
+        lcd.printf("Min temp: %6.1lf F", convertTemp(avg_min_temp / fps));  
+
+        lcd.setTextSize(2);
         lcd.setCursor(0, 280);
-        lcd.setTextColor(camColors[map_f(max_temp / fps, MINTEMP, MAXTEMP)]);
-        lcd.println("  Max Temp:");
-        lcd.printf("  %6.1lf C", max_temp / fps);
+        if(DYNAMIC_RANGE != 1) {
+          lcd.setTextColor(camColors[map_f(avg_max_temp / fps, MINTEMP, MAXTEMP)]);
+        }
+        lcd.printf("Max temp: %6.1lf F", convertTemp(avg_max_temp / fps));
 
         lcd.setTextSize(1);
         lcd.setTextColor(TFT_WHITE);
         lcd.setCursor(0, 350);
-        lcd.printf("  FPS:%2.1lf", fps / 2.0);
+        lcd.printf("  FPS:%2.1lf", fps / UI_REFRESH_SECONDS);
+
+        lcd.setCursor(0, 360);
+        lcd.printf("  frame[1]:%2.1lf", convertTemp(frame[1]));
+
+        lcd.setCursor(0, 370);
+        lcd.printf("  frame[767]:%2.1lf", convertTemp(frame[767]));
+
+        lcd.setCursor(0, 380);
+        lcd.printf("  MINTEMP:%2.1lf", convertTemp(MINTEMP));
+
+        lcd.setCursor(0, 390);
+        lcd.printf("  MAXTEMP:%2.1lf", convertTemp(MAXTEMP));
 
 #ifdef WIFI_MODE
 
         String udp_str = "";
-        udp_str = udp_str + "{\"MAXTEMP\":" + max_temp / fps + "}";
+        udp_str = udp_str + "{\"MAXTEMP\":" + avg_max_temp / fps + ", \"MINTEMP\":" + avg_min_temp / fps + "}";
         send_udp(udp_str);
 
 #endif
@@ -290,12 +339,13 @@ void loop()
 
             //Save Max temperture to sd card
             char c[20];
-            sprintf(c, "[%d]\tT:%lf C\n", record_index++, max_temp / fps);
+            sprintf(c, "[%d]\tT:%lf C\n", record_index++, avg_max_temp / fps);
             appendFile(SD, "/temper.txt", c);
         }
 
         runtime = millis();
-        max_temp = 0.0;
+        avg_max_temp = 0.0;
+        avg_min_temp = 0.0;
         fps = 0;
     }
 }
@@ -421,15 +471,18 @@ void qusort(float s[], int start, int end) //自定义函数 qusort()
 
 void display_ui()
 {
+	  lcd.fillRect(0, 255, 320, 50, TFT_BLACK);
     for (int i = 0; i < 256; i++)
         lcd.drawFastVLine(32 + i, 255, 20, camColors[i]);
 
     lcd.setTextSize(2);
     lcd.setCursor(5, 255);
-    lcd.println((String) "" + MINTEMP);
+    //lcd.println((String) "" + MINTEMP);
+    lcd.printf("%2.0lf", convertTemp(MINTEMP));
 
     lcd.setCursor(290, 255);
-    lcd.println((String) "" + MAXTEMP);
+    //lcd.println((String) "" + MAXTEMP);
+    lcd.printf("%2.0lf", convertTemp(MAXTEMP));
 
     lcd.fillRect(220, 380, 80, 80, TFT_GREEN);
     lcd.setCursor(230, 390);
